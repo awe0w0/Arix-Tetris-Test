@@ -4,6 +4,7 @@ using namespace std;
 #include <cstdlib>
 #include <thread>
 #include <Windows.h>
+#include <vector>
 
 wstring tetromino[7];
 int nFieldWidth = 12;
@@ -43,6 +44,7 @@ bool DoesPieceFit(int nTetromino, int nRotation, int nPosX, int nPosY) {
 }
 
 int main() {
+	angin:
 	srand(time(NULL));
 	//creat assets
 	tetromino[0].append(L"..X.");
@@ -91,11 +93,11 @@ int main() {
 	SetConsoleActiveScreenBuffer(hConsole);
 	DWORD dwBytesWritten = 0;	
 
-
+	
 
 	bool bGameOver = false;
 
-	int nCurrentPiece = 1;
+	int nCurrentPiece = 0;
 	int nCurrentRotation = 0;
 	int nCurrentX = nFieldWidth / 2;
 	int nCurrentY = 0;
@@ -106,6 +108,10 @@ int main() {
 	int nSpeed = 20;
 	int nSpeedCounter = 0;
 	bool bForceDown = false;
+	int nPieceCount = 0;
+	int nScore = 0;
+
+	vector<int> vLines;
 
 	while (!bGameOver) {
 		
@@ -143,14 +149,38 @@ int main() {
 						if (tetromino[nCurrentPiece][Rotate(px, py, nCurrentRotation)] == L'X')
 							pFiled[(nCurrentY + py) * nFieldWidth + (nCurrentX + px)] = nCurrentPiece + 1;
 
+				nPieceCount++;
+				if (nPieceCount % 10 == 0)
+					if (nSpeed >= 10) nSpeed--;
 
-				//Check have we got ant lines
+				//Check have we got any lines
+
+				for(int py = 0;py<4 ;py++)
+					if (nCurrentY + py < nFileHight - 1)
+					{
+						bool bLine = true;
+						for (int px = 1; px < nFieldWidth; px++)
+							bLine &= (pFiled[(nCurrentY + py) * nFieldWidth + px]) != 0;
+
+						if (bLine) {
+							//Remove Line, set to =
+							for (int px = 1; px < nFieldWidth - 1; px++)
+								pFiled[(nCurrentY + py) * nFieldWidth + px] = 8;
+
+							vLines.push_back(nCurrentY + py);
+						}
+					}
+
+				nScore += 25;
+				if (!vLines.empty())
+					nScore += (1 << vLines.size()) * 100;
+
 
 				//Choice next piece
 				nCurrentX = nFieldWidth / 2;
 				nCurrentY = 0;
 				nCurrentRotation = 0;
-				nCurrentPiece = rand() % 7;
+				nCurrentPiece = rand() % 6;
 
 				//if piece does not fit
 				bGameOver = !DoesPieceFit(nCurrentPiece, nCurrentRotation, nCurrentX, nCurrentY);
@@ -168,12 +198,45 @@ int main() {
 		//Draw Current Piece
 		for (int px = 0; px < 4; px++)
 			for (int py = 0; py < 4; py++)
-				if (tetromino[nCurrentPiece][Rotate(px, py, nCurrentRotation)] == L'X')
-					screen[(nCurrentY + py + 2) * nScreenWidth + (nCurrentX + px + 2)] = nCurrentPiece + 65;
+				if (tetromino[nCurrentPiece][Rotate(px, py, nCurrentRotation)] == L'X') 
+					screen[(nCurrentY + py + 2) * nScreenWidth + (nCurrentX + px + 2 )] = nCurrentPiece + 65;
+
+		//Draw Score
+		swprintf_s(&screen[nScreenWidth + nFieldWidth + 6] , 16, L"SCORE: %8d", nScore);
+
+
+		if (!vLines.empty()) {
+			//Display Frame (cheekily to draw lines)
+			WriteConsoleOutputCharacter(hConsole, screen, nScreenWidth * nScreenHight, { 0,0 }, &dwBytesWritten);
+			this_thread::sleep_for(400ms); //Delay a bit
+			
+			for (auto& v : vLines)
+				for (int px = 1; px < nFieldWidth - 1; px++) {
+					for (int py = v; py > 0; py--)
+						pFiled[py * nFieldWidth + px] = pFiled[(py - 1) * nFieldWidth + px];
+					pFiled[px] = 0;
+				}
+
+			vLines.clear();
+		}
 
 		//Display Frame
 		WriteConsoleOutputCharacter(hConsole, screen, nScreenWidth * nScreenHight, { 0,0 }, &dwBytesWritten);
 	}
+
+	// Oh Dear
+	CloseHandle(hConsole);
+	cout << "Game Over!! Score : " << nScore << endl;
+	system("pause");
+
+	cout << endl << endl;
+	cout << "angin?" << endl;
+	cout << "1.yes" << endl;
+	cout << "2.no" << endl;
+	int choice = 0;
+	cin >> choice;
+	if (choice == 1)
+		goto angin;
 
 	return 0;
 }
